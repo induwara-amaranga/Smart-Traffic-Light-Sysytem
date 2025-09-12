@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Traffic Light 3D Visualization</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.9);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            min-width: 280px;
+        }
+        
+        #info h3 {
+            margin-top: 0;
+            color: #4CAF50;
+            text-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.9);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 100;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        button {
+            margin: 5px;
+            padding: 12px 20px;
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.5);
+        }
+        
+        button.emergency {
+            background: linear-gradient(45deg, #f44336, #d32f2f);
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
+        }
+        
+        button.emergency:hover {
+            box-shadow: 0 6px 20px rgba(244, 67, 54, 0.5);
+        }
+        
+        .status-item {
+            margin: 8px 0;
+            padding: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 5px;
+        }
+        
+        .emergency-alert {
+            animation: pulse 1s infinite;
+            background: rgba(244, 67, 54, 0.2) !important;
+            border: 1px solid #f44336;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        #performance {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            color: #4CAF50;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div id="performance">
+        FPS: <span id="fps">60</span><br>
+        Detection: <span id="detection-rate">Active</span>
+    </div>
+
+    <div id="info">
+        <h3>🚦 Smart Traffic AI System</h3>
+        <div class="status-item">
+            <strong>Status:</strong> <span id="status">Normal Operation</span>
+        </div>
+        <div class="status-item">
+            <strong>Vehicle Counts:</strong><br>
+            🔴 North: <span id="north-count">5</span> vehicles<br>
+            🔴 East: <span id="east-count">3</span> vehicles<br>
+            🔴 South: <span id="south-count">7</span> vehicles
+        </div>
+        <div class="status-item">
+            <strong>Current Green:</strong> <span id="active-light">South Path</span>
+        </div>
+        <div class="status-item">
+            <strong>AI Detection:</strong> <span id="ai-status">YOLO Model Active</span>
+        </div>
+        <div class="status-item">
+            <strong>Sound Monitoring:</strong> <span id="sound-status">Listening for Sirens</span>
+        </div>
+    </div>
+    
+    <div id="controls">
+        <h4>🎮 Exhibition Controls</h4>
+        <button onclick="simulateEmergency('north')" class="emergency">🚑 Emergency North</button>
+        <button onclick="simulateEmergency('east')" class="emergency">🚒 Emergency East</button>
+        <button onclick="simulateEmergency('south')" class="emergency">🚓 Emergency South</button><br>
+        <button onclick="adjustTraffic('north', 2)">⬆️ Increase North Traffic</button>
+        <button onclick="adjustTraffic('south', 2)">⬆️ Increase South Traffic</button><br>
+        <button onclick="toggleNightMode()">🌙 Night Mode</button>
+        <button onclick="resetSystem()">🔄 Reset System</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Three.js 3D Scene Setup
+        let scene, camera, renderer, junction;
+        let trafficLights = {};
+        let vehicles = [];
+        let emergencyMode = false;
+        let nightMode = false;
+        let frameCount = 0;
+        let lastTime = performance.now();
+        
+        // Traffic simulation data
+        let vehicleCounts = { north: 5, east: 3, south: 7 };
+        let currentGreen = 'south';
+        let trafficCycle = 0;
+        let emergencyVehicle = null;
+        
+        init();
+        animate();
+        
+        function init() {
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB);
+            scene.fog = new THREE.Fog(0x87CEEB, 50, 200);
+            
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(25, 30, 25);
+            camera.lookAt(0, 0, 0);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.2;
+            document.body.appendChild(renderer.domElement);
+            
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+            directionalLight.position.set(-10, 20, 10);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 100;
+            directionalLight.shadow.camera.left = -50;
+            directionalLight.shadow.camera.right = 50;
+            directionalLight.shadow.camera.top = 50;
+            directionalLight.shadow.camera.bottom = -50;
+            scene.add(directionalLight);
+            
+            // Create scene elements
+            createJunction();
+            createTrafficLights();
+            createVehicles();
+            createEnvironment();
+            
+            // Start traffic simulation
+            startTrafficSimulation();
+            startVehicleAnimation();
+        }
+        
+        function createJunction() {
+            // Main road surface
+            const roadGeometry = new THREE.PlaneGeometry(60, 60);
+            const roadMaterial = new THREE.MeshLambertMaterial({ 
+                color: 0x333333,
+                transparent: true,
+                opacity: 0.9
+            });
+            const road = new THREE.Mesh(roadGeometry, roadMaterial);
+            road.rotation.x = -Math.PI / 2;
+            road.receiveShadow = true;
+            scene.add(road);
+            
+            // Create detailed road markings
+            createRoadMarkings();
+            
+            // Add crosswalks
+            createCrosswalks();
+        }
+        
+        function createRoadMarkings() {
+            const lineGeometry = new THREE.BoxGeometry(0.3, 0.05, 25);
+            const lineMaterial = new THREE.MeshLambertMaterial({ color: 0xFFFFFF });
+            
+            // Center lines for each direction
+            const directions = [
+                { x: 0, z: 0, rotation: 0 },     // North-South
+                { x: 0, z: 0, rotation: Math.PI/2 }, // East-West
+            ];
+            
+            directions.forEach(dir => {
+                const line = new THREE.Mesh(lineGeometry, lineMaterial);
+                line.position.set(dir.x, 0.05, dir.z);
+                line.rotation.y = dir.rotation;
+                scene.add(line);
+                
+                // Dashed lines
+                for(let i = -3; i <= 3; i++) {
+                    if(i !== 0) {
+                        const dashGeometry = new THREE.BoxGeometry(0.15, 0.05, 2);
+                        const dash = new THREE.Mesh(dashGeometry, lineMaterial);
+                        if(dir.rotation === 0) {
+                            dash.position.set(i * 3, 0.05, 0);
+                        } else {
+                            dash.position.set(0, 0.05, i * 3);
+                            dash.rotation.y = Math.PI/2;
+                        }
+                        scene.add(dash);
+                    }
+                }
+            });
+        }
+        
+        function createCrosswalks() {
+            const crosswalkMaterial = new THREE.MeshLambertMaterial({ color: 0xFFFFFF });
+            
+            const positions = [
+                { x: -15, z: 8, rotation: 0 },
+                { x: 15, z: 8, rotation: 0 },
+                { x: -15, z: -8, rotation: 0 },
+                { x: 15, z: -8, rotation: 0 },
+                { x: 8, z: 15, rotation: Math.PI/2 },
+                { x: 8, z: -15, rotation: Math.PI/2 },
+                { x: -8, z: 15, rotation: Math.PI/2 },
+                { x: -8, z: -15, rotation: Math.PI/2 },
+            ];
+            
+            positions.forEach(pos => {
+                for(let i = 0; i < 8; i++) {
+                    const stripeGeometry = new THREE.BoxGeometry(
+                        pos.rotation === 0 ? 1 : 8, 0.05, pos.rotation === 0 ? 8 : 1
+                    );
+                    const stripe = new THREE.Mesh(stripeGeometry, crosswalkMaterial);
+                    
+                    if(pos.rotation === 0) {
+                        stripe.position.set(pos.x + (i-4) * 1.2, 0.05, pos.z);
+                    } else {
+                        stripe.position.set(pos.x, 0.05, pos.z + (i-4) * 1.2);
+                    }
+                    scene.add(stripe);
+                }
+            });
+        }
+        
+        function createTrafficLights() {
+            const positions = {
+                north: { x: -12, z: 12, rotation: Math.PI },
+                east: { x: 12, z: 12, rotation: -Math.PI/2 },
+                south: { x: 12, z: -12, rotation: 0 }
+            };
+            
+            Object.keys(positions).forEach(direction => {
+                const lightGroup = new THREE.Group();
+                
+                // Modern traffic light pole
+                const poleGeometry = new THREE.CylinderGeometry(0.3, 0.3, 10);
+                const poleMaterial = new THREE.MeshLambertMaterial({ color: 0x555555 });
+                const pole = new THREE.Mesh(poleGeometry, poleMaterial);
+                pole.position.y = 5;
+                pole.castShadow = true;
+                lightGroup.add(pole);
+                
+                // Traffic light housing with modern design
+                const housingGeometry = new THREE.BoxGeometry(1.2, 4, 0.8);
+                const housingMaterial = new THREE.MeshLambertMaterial({ color: 0x222222 });
+                const housing = new THREE.Mesh(housingGeometry, housingMaterial);
+                housing.position.y = 8;
+                housing.castShadow = true;
+                lightGroup.add(housing);
+                
+                // Light bulbs with glow effect
+                const lights = {};
+                const colors = { red: 0xff0000, yellow: 0xffff00, green: 0x00ff00 };
+                const lightPositions = { red: 1.2, yellow: 0, green: -1.2 };
+                
+                Object.keys(colors).forEach(color => {
+                    const lightGeometry = new THREE.SphereGeometry(0.4);
+                    const lightMaterial = new THREE.MeshLambertMaterial({ 
+                        color: colors[color],
+                        transparent: true,
+                        opacity: 0.2,
+                        emissive: colors[color],
+                        emissiveIntensity: 0.1
+                    });
+                    const light = new THREE.Mesh(lightGeometry, lightMaterial);
+                    light.position.set(0, 8 + lightPositions[color], 0.5);
+                    
+                    // Add point light for glow effect
+                    const pointLight = new THREE.PointLight(colors[color], 0, 10);
+                    pointLight.position.copy(light.position);
+                    light.add(pointLight);
+                    
+                    lights[color] = { mesh: light, pointLight: pointLight };
+                    lightGroup.add(light);
+                });
+                
+                // Position and rotate the entire traffic light
+                lightGroup.position.set(positions[direction].x, 0, positions[direction].z);
+                lightGroup.rotation.y = positions[direction].rotation;
+                
+                trafficLights[direction] = { group: lightGroup, lights: lights };
+                scene.add(lightGroup);
+            });
+            
+            // Initialize with all red
+            setAllLights('red');
+        }
+        
+        function createVehicles() {
+            vehicles = []; // Clear existing vehicles
+            
+            Object.keys(vehicleCounts).forEach(direction => {
+                for (let i = 0; i < vehicleCounts[direction]; i++) {
+                    const vehicle = createVehicle();
+                    positionVehicle(vehicle, direction, i);
+                    vehicles.push({ 
+                        mesh: vehicle, 
+                        direction: direction, 
+                        index: i,
+                        speed: 0.1 + Math.random() * 0.05,
+                        originalPosition: vehicle.position.clone()
+                    });
+                    scene.add(vehicle);
+                }
+            });
+            
+            updateVehicleCountDisplay();
+        }
+        
+        function createVehicle() {
+            const vehicleGroup = new THREE.Group();
+            
+            // Random vehicle type
+            const vehicleTypes = ['car', 'bus', 'truck'];
+            const vehicleType = vehicleTypes[Math.floor(Math.random() * vehicleTypes.length)];
+            
+            let bodyGeometry, bodyColor;
+            
+            switch(vehicleType) {
+                case 'bus':
+                    bodyGeometry = new THREE.BoxGeometry(2.5, 2, 8);
+                    bodyColor = new THREE.Color().setHSL(0.1, 0.8, 0.6); // Yellow-ish
+                    break;
+                case 'truck':
+                    bodyGeometry = new THREE.BoxGeometry(2.2, 2.5, 6);
+                    bodyColor = new THREE.Color().setHSL(0, 0, 0.3); // Dark
+                    break;
+                default: // car
+                    bodyGeometry = new THREE.BoxGeometry(1.8, 1.2, 4);
+                    bodyColor = new THREE.Color().setHSL(Math.random(), 0.7, 0.5);
+            }
+            
+            const bodyMaterial = new THREE.MeshLambertMaterial({ color: bodyColor });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 0.6;
+            body.castShadow = true;
+            body.receiveShadow = true;
+            vehicleGroup.add(body);
+            
+            // Add windows
+            const windowGeometry = new THREE.BoxGeometry(1.6, 0.8, 3);
+            const windowMaterial = new THREE.MeshLambertMaterial({ 
+                color: 0x4444aa, 
+                transparent: true, 
+                opacity: 0.7 
+            });
+            const windows = new THREE.Mesh(windowGeometry, windowMaterial);
+            windows.position.y = 1.2;
+            vehicleGroup.add(windows);
+            
+            // Wheels
+            const wheelGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.3);
+            const wheelMaterial = new THREE.MeshLambertMaterial({ color: 0x222222 });
+            
+            const wheelPositions = [
+                { x: -0.8, z: 1.5 }, { x: 0.8, z: 1.5 },
+                { x: -0.8, z: -1.5 }, { x: 0.8, z: -1.5 }
+            ];
+            
+            wheelPositions.forEach(pos => {
+                const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+                wheel.position.set(pos.x, 0.4, pos.z);
+                wheel.rotation.z = Math.PI / 2;
+                wheel.castShadow = true;
+                vehicleGroup.add(wheel);
+            });
+            
+            // Add headlights for night mode
+            const headlightGeometry = new THREE.SphereGeometry(0.15);
+            const headlightMaterial = new THREE.MeshLambertMaterial({ 
+                color: 0xffffaa,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            const headlight1 = new THREE.Mesh(headlightGeometry, headlightMaterial);
+            const headlight2 = new THREE.Mesh(headlightGeometry, headlightMaterial);
+            headlight1.position.set(-0.5, 0.5, 2.2);
+            headlight2.position.set(0.5, 0.5, 2.2);
+            vehicleGroup.add(headlight1);
+            vehicleGroup.add(headlight2);
+            
+            return vehicleGroup;
+        }
+        
+        function positionVehicle(vehicle, direction, index) {
+            const spacing = 7;
+            const offset = index * spacing + 15;
+            
+            switch (direction) {
+                case 'north':
+                    vehicle.position.set(-3, 0, offset);
+                    vehicle.rotation.y = Math.PI;
+                    break;
+                case 'east':
+                    vehicle.position.set(-offset, 0, 3);
+                    vehicle.rotation.y = Math.PI / 2;
+                    break;
+                case 'south':
+                    vehicle.position.set(3, 0, -offset);
+                    break;
+            }
+        }
+        
+        function createEnvironment() {
+            // Add some buildings for context
+            createBuildings();
+            
+            // Add trees
+            createTrees();
+            
+            // Add street lamps
+            createStreetLamps();
+        }
+        
+        function createBuildings() {
+            const buildingPositions = [
+                { x: -40, z: -40, w: 15, h: 20, d: 15 },
+                { x: 40, z: -40, w: 12, h: 25, d: 12 },
+                { x: -40, z: 40, w: 18, h: 15, d: 18 },
+                { x: 40, z: 40, w: 10, h: 30, d: 10 }
+            ];
+            
+            buildingPositions.forEach(pos => {
+                const buildingGeometry = new THREE.BoxGeometry(pos.w, pos.h, pos.d);
+                const buildingMaterial = new THREE.MeshLambertMaterial({ 
+                    color: new THREE.Color().setHSL(0.6, 0.2, 0.4 + Math.random() * 0.3)
+                });
+                const building = new THREE.Mesh(buildingGeometry, buildingMaterial);
+                building.position.set(pos.x, pos.h/2, pos.z);
+                building.castShadow = true;
+                building.receiveShadow = true;
+                scene.add(building);
+                
+                // Add windows
+                for(let i = 0; i < 3; i++) {
+                    for(let j = 0; j < 5; j++) {
+                        const windowGeometry = new THREE.PlaneGeometry(1.5, 2);
+                        const windowMaterial = new THREE.MeshLambertMaterial({ 
+                            color: Math.random() > 0.7 ? 0xffffaa : 0x222222,
+                            transparent: true,
+                            opacity: 0.8
+                        });
+                        const window = new THREE.Mesh(windowGeometry, windowMaterial);
+                        window.position.set(
+                            pos.x + pos.w/2 + 0.01,
+                            5 + j * 4,
+                            pos.z - pos.d/2 + 2 + i * 4
+                        );
+                        window.rotation.y = -Math.PI/2;
+                        scene.add(window);
+                    }
+                }
+            });
+        }
+        
+        function createTrees() {
+            const treePositions = [
+                { x: -25, z: 25 }, { x: 25, z: 25 },
+                { x: -25, z: -25 }, { x: 25, z: -25 }
+            ];
+            
+            treePositions.forEach(pos => {
+                // Tree trunk
+                const trunkGeometry = new THREE.CylinderGeometry(0.5, 0.8, 6);
+                const trunkMaterial = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+                const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+                trunk.position.set(pos.x, 3, pos.z);
+                trunk.castShadow = true;
+                scene.add(trunk);
+                
+                // Tree foliage
+                const foliageGeometry = new THREE.SphereGeometry(4);
+                const foliageMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 });
+                const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
+                foliage.position.set(pos.x, 8, pos.z);
+                foliage.castShadow = true;
+                foliage.receiveShadow = true;
+                scene.add(foliage);
+            });
+        }
+        
+        function createStreetLamps() {
+            const lampPositions = [
+                { x: -20, z: 10 }, { x: -10, z: 20 },
+                { x: 10, z: 20 }, { x: 20, z: 10 },
+                { x: 20, z: -10 }, { x: 10, z: -20 },
+                { x: -10, z: -20 }, { x: -20, z: -10 }
+            ];
+            
+            lampPositions.forEach(pos => {
+                // Lamp post
+                const postGeometry = new THREE.CylinderGeometry(0.1, 0.15, 8);
+                const postMaterial = new THREE.MeshLambertMaterial({ color: 0x444444 });
+                const post = new THREE.Mesh(postGeometry, postMaterial);
+                post.position.set(pos.x, 4, pos.z);
+                post.castShadow = true;
+                scene.add(post);
+                
+                // Lamp head
+                const lampGeometry = new THREE.SphereGeometry(0.8);
+                const lampMaterial = new THREE.MeshLambertMaterial({ 
+                    color: 0xffffaa,
+                    transparent: true,
+                    opacity: nightMode ? 0.9 : 0.3
+                });
+                const lamp = new THREE.Mesh(lampGeometry, lampMaterial);
+                lamp.position.set(pos.x, 8.5, pos.z);
+                scene.add(lamp);
+                
+                // Add point light
+                const streetLight = new THREE.PointLight(0xffffaa, nightMode ? 1 : 0, 20);
+                streetLight.position.copy(lamp.position);
+                scene.add(streetLight);
+            });
+        }
+        
+        function setAllLights(color) {
+            Object.keys(trafficLights).forEach(direction => {
+                const lights = trafficLights[direction].lights;
+                Object.keys(lights).forEach(lightColor => {
+                    const lightObj = lights[lightColor];
+                    lightObj.mesh.material.opacity = lightColor === color ? 0.9 : 0.2;
+                    lightObj.mesh.material.emissiveIntensity = lightColor === color ? 0.5 : 0.1;
+                    lightObj.pointLight.intensity = lightColor === color ? 1 : 0;
+                });
+            });
+        }
+        
+        function setGreenLight(direction) {
+            // Set all to red first
+            setAllLights('red');
+            
+            // Set specific direction to green
+            const lights = trafficLights[direction].lights;
+            lights.green.mesh.material.opacity = 0.9;
+            lights.green.mesh.material.emissiveIntensity = 0.5;
+            lights.green.pointLight.intensity = 1;
+            lights.red.mesh.material.opacity = 0.2;
+            lights.red.mesh.material.emissiveIntensity = 0.1;
+            lights.red.pointLight.intensity = 0;
+            
+            currentGreen = direction;
+            
+            // Update UI
+            document.getElementById('active-light').textContent = 
+                direction.charAt(0).toUpperCase() + direction.slice(1) + ' Path';
+        }
+        
+        function startTrafficSimulation() {
+            setInterval(() => {
+                if (!emergencyMode) {
+                    const directions = ['north', 'east', 'south'];
+                    
+                    // Smart priority based on vehicle count
+                    const maxCount = Math.max(...Object.values(vehicleCounts));
+                    const priorityDirections = Object.keys(vehicleCounts)
+                        .filter(dir => vehicleCounts[dir] === maxCount);
+                    
+                    const nextDirection = priorityDirections[
+                        Math.floor(Math.random() * priorityDirections.length)
+                    ];
+                    
+                    // Yellow phase
+                    setAllLights('yellow');
+                    setTimeout(() => {
+                        setGreenLight(nextDirection);
+                    }, 2000);
+                }
+            }, 8000); // Change every 8 seconds
+        }
+        
+        function startVehicleAnimation() {
+            setInterval(() => {
+                // Animate vehicles slightly (idle movement)
+                vehicles.forEach((vehicle, index) => {
+                    const time = Date.now() * 0.001;
+                    vehicle.mesh.position.y = 0.1 + Math.sin(time + index) * 0.05;
+                    
+                    // Simulate traffic movement when green
+                    if (vehicle.direction === currentGreen && !emergencyMode) {
+                        // Move vehicles forward slightly
+                        const direction = vehicle.direction;
+                        const moveDistance = vehicle.speed;
+                        
+                        switch (direction) {
+                            case 'north':
+                                vehicle.mesh.position.z -= moveDistance;
+                                if (vehicle.mesh.position.z < -30) {
+                                    vehicle.mesh.position.z = vehicle.originalPosition.z;
+                                }
+                                break;
+                            case 'east':
+                                vehicle.mesh.position.x += moveDistance;
+                                if (vehicle.mesh.position.x > 30) {
+                                    vehicle.mesh.position.x = vehicle.originalPosition.x;
+                                }
+                                break;
+                            case 'south':
+                                vehicle.mesh.position.z += moveDistance;
+                                if (vehicle.mesh.position.z > 30) {
+                                    vehicle.mesh.position.z = vehicle.originalPosition.z;
+                                }
+                                break;
+                        }
+                    }
+                });
+            }, 100);
+        }
+        
+        function simulateEmergency(direction) {
+            emergencyMode = true;
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = `EMERGENCY - ${direction.toUpperCase()} PATH PRIORITY`;
+            statusEl.parentElement.classList.add('emergency-alert');
+            
+            // Sound alert simulation
+            document.getElementById('sound-status').textContent = `🚨 SIREN DETECTED: ${direction.toUpperCase()}`;
+            
+            // Flash all yellow first
+            setAllLights('yellow');
+            
+            setTimeout(() => {
+                setGreenLight(direction);
+                
+                // Create and animate emergency vehicle
+                createEmergencyVehicle(direction);
+                
+                // Clear emergency mode after 8 seconds
+                setTimeout(() => {
+                    emergencyMode = false;
+                    statusEl.textContent = 'Normal Operation';
+                    statusEl.parentElement.classList.remove('emergency-alert');
+                    document.getElementById('sound-status').textContent = 'Listening for Sirens';
+                    
+                    if (emergencyVehicle) {
+                        scene.remove(emergencyVehicle);
+                        emergencyVehicle = null;
+                    }
+                }, 8000);
+            }, 2000);
+        }
+        
+        function createEmergencyVehicle(direction) {
+            const vehicle = createVehicle();
+            
+            // Make it look like an ambulance (white with red cross)
+            vehicle.children[0].material.color.setHex(0xffffff);
+            
+            // Add emergency lights
+            const redLight = new THREE.PointLight(0xff0000, 1, 15);
+            redLight.position.set(-0.5, 2, 0);
+            vehicle.add(redLight);
+            
+            const blueLight = new THREE.PointLight(0x0000ff, 1, 15);
+            blueLight.position.set(0.5, 2, 0);
+            vehicle.add(blueLight);
+            
+            // Add red cross
+            const crossGeometry = new THREE.BoxGeometry(0.1, 0.5, 0.1);
+            const crossMaterial = new THREE.MeshLambertMaterial({ color: 0xff0000 });
+            const cross1 = new THREE.Mesh(crossGeometry, crossMaterial);
+            const cross2 = new THREE.Mesh(crossGeometry, crossMaterial);
+            cross2.rotation.z = Math.PI/2;
+            cross1.position.set(0, 1.5, 2.1);
+            cross2.position.set(0, 1.5, 2.1);
+            vehicle.add(cross1);
+            vehicle.add(cross2);
+            
+            // Position emergency vehicle
+            positionVehicle(vehicle, direction, -3);
+            
+            // Animate emergency lights
+            let lightToggle = true;
+            const lightInterval = setInterval(() => {
+                if (emergencyVehicle) {
+                    redLight.intensity = lightToggle ? 2 : 0;
+                    blueLight.intensity = lightToggle ? 0 : 2;
+                    lightToggle = !lightToggle;
+                } else {
+                    clearInterval(lightInterval);
+                }
+            }, 200);
+            
+            emergencyVehicle = vehicle;
+            scene.add(vehicle);
+            
+            // Animate emergency vehicle movement
+            const moveEmergencyVehicle = () => {
+                if (!emergencyVehicle) return;
+                
+                const speed = 0.5;
+                switch (direction) {
+                    case 'north':
+                        emergencyVehicle.position.z -= speed;
+                        if (emergencyVehicle.position.z < -40) {
+                            scene.remove(emergencyVehicle);
+                            emergencyVehicle = null;
+                            return;
+                        }
+                        break;
+                    case 'east':
+                        emergencyVehicle.position.x += speed;
+                        if (emergencyVehicle.position.x > 40) {
+                            scene.remove(emergencyVehicle);
+                            emergencyVehicle = null;
+                            return;
+                        }
+                        break;
+                    case 'south':
+                        emergencyVehicle.position.z += speed;
+                        if (emergencyVehicle.position.z > 40) {
+                            scene.remove(emergencyVehicle);
+                            emergencyVehicle = null;
+                            return;
+                        }
+                        break;
+                }
+                requestAnimationFrame(moveEmergencyVehicle);
+            };
+            requestAnimationFrame(moveEmergencyVehicle);
+        }
+        
+        function adjustTraffic(direction, change) {
+            vehicleCounts[direction] = Math.max(0, Math.min(15, vehicleCounts[direction] + change));
+            
+            // Remove old vehicles
+            vehicles.filter(v => v.direction === direction).forEach(v => {
+                scene.remove(v.mesh);
+            });
+            vehicles = vehicles.filter(v => v.direction !== direction);
+            
+            // Add new vehicles
+            for (let i = 0; i < vehicleCounts[direction]; i++) {
+                const vehicle = createVehicle();
+                positionVehicle(vehicle, direction, i);
+                vehicles.push({ 
+                    mesh: vehicle, 
+                    direction: direction, 
+                    index: i,
+                    speed: 0.1 + Math.random() * 0.05,
+                    originalPosition: vehicle.position.clone()
+                });
+                scene.add(vehicle);
+            }
+            
+            updateVehicleCountDisplay();
+        }
+        
+        function updateVehicleCountDisplay() {
+            document.getElementById('north-count').textContent = vehicleCounts.north;
+            document.getElementById('east-count').textContent = vehicleCounts.east;
+            document.getElementById('south-count').textContent = vehicleCounts.south;
+        }
+        
+        function toggleNightMode() {
+            nightMode = !nightMode;
+            
+            if (nightMode) {
+                scene.background = new THREE.Color(0x001122);
+                scene.fog.color.setHex(0x001122);
+                
+                // Dim ambient light
+                scene.children.forEach(child => {
+                    if (child.type === 'AmbientLight') {
+                        child.intensity = 0.1;
+                    }
+                    if (child.type === 'DirectionalLight') {
+                        child.intensity = 0.3;
+                    }
+                });
+            } else {
+                scene.background = new THREE.Color(0x87CEEB);
+                scene.fog.color.setHex(0x87CEEB);
+                
+                // Restore daylight
+                scene.children.forEach(child => {
+                    if (child.type === 'AmbientLight') {
+                        child.intensity = 0.4;
+                    }
+                    if (child.type === 'DirectionalLight') {
+                        child.intensity = 1.0;
+                    }
+                });
+            }
+        }
+        
+        function resetSystem() {
+            emergencyMode = false;
+            nightMode = false;
+            vehicleCounts = { north: 5, east: 3, south: 7 };
+            
+            // Reset UI
+            document.getElementById('status').textContent = 'Normal Operation';
+            document.getElementById('status').parentElement.classList.remove('emergency-alert');
+            document.getElementById('sound-status').textContent = 'Listening for Sirens';
+            
+            // Reset scene
+            toggleNightMode(); // Reset to day if in night mode
+            
+            // Recreate vehicles
+            vehicles.forEach(v => scene.remove(v.mesh));
+            createVehicles();
+            
+            // Remove emergency vehicle if present
+            if (emergencyVehicle) {
+                scene.remove(emergencyVehicle);
+                emergencyVehicle = null;
+            }
+            
+            setAllLights('red');
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Calculate FPS
+            frameCount++;
+            const now = performance.now();
+            if (now >= lastTime + 1000) {
+                document.getElementById('fps').textContent = Math.round(frameCount * 1000 / (now - lastTime));
+                frameCount = 0;
+                lastTime = now;
+            }
+            
+            // Auto-rotate camera for demo effect
+            const time = Date.now() * 0.0005;
+            camera.position.x = Math.cos(time) * 50;
+            camera.position.z = Math.sin(time) * 50;
+            camera.lookAt(0, 0, 0);
+            
+            renderer.render(scene, camera);
+        }
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // Update AI status periodically
+        setInterval(() => {
+            const detectionModes = [
+                'YOLO Model Active - Detecting Vehicles',
+                'Processing Camera Feed',
+                'Analyzing Traffic Patterns',
+                'AI Computing Optimal Timing'
+            ];
+            document.getElementById('ai-status').textContent = 
+                detectionModes[Math.floor(Date.now() / 3000) % detectionModes.length];
+        }, 3000);
+    </script>
+</body>
+</html>

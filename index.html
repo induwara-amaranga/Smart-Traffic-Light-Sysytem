@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Four-Way Traffic Light System</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(to bottom, #2c3e50, #1a1a2e);
+            color: #ecf0f1;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #f39c12;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            margin-bottom: 20px;
+        }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 1000px;
+        }
+        
+        .junction {
+            position: relative;
+            width: 600px;
+            height: 600px;
+            margin: 20px auto;
+            background-color: #34495e;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+        }
+        
+        .road {
+            position: absolute;
+            background-color: #7f8c8d;
+        }
+        
+        .road-horizontal {
+            width: 100%;
+            height: 100px;
+            top: 250px;
+            left: 0;
+        }
+        
+        .road-vertical {
+            width: 100px;
+            height: 100%;
+            left: 250px;
+            top: 0;
+        }
+        
+        .center-circle {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            background-color: #2c3e50;
+            border-radius: 50%;
+            top: 260px;
+            left: 260px;
+            z-index: 1;
+            border: 3px solid #f39c12;
+        }
+        
+        .traffic-light {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px;
+            background-color: #2c3e50;
+            border-radius: 15px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
+            z-index: 2;
+            border: 3px solid #7f8c8d;
+        }
+        
+        .traffic-light.north {
+            top: 40px;
+            left: 270px;
+        }
+        
+        .traffic-light.east {
+            top: 270px;
+            right: 40px;
+        }
+        
+        .traffic-light.south {
+            bottom: 40px;
+            left: 270px;
+        }
+        
+        .traffic-light.west {
+            top: 270px;
+            left: 40px;
+        }
+        
+        .light {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            margin: 10px;
+            background-color: #333;
+            box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.8);
+            transition: background-color 0.3s;
+        }
+        
+        .light.red.on {
+            background-color: #e74c3c;
+            box-shadow: 0 0 25px #e74c3c;
+        }
+        
+        .light.yellow.on {
+            background-color: #f1c40f;
+            box-shadow: 0 0 25px #f1c40f;
+        }
+        
+        .light.green.on {
+            background-color: #2ecc71;
+            box-shadow: 0 0 25px #2ecc71;
+        }
+        
+        .direction-label {
+            font-weight: bold;
+            font-size: 18px;
+            margin-top: 10px;
+            color: #ecf0f1;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+        }
+        
+        .vehicle-controls {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            margin-top: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .direction-control {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #34495e;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px;
+            min-width: 150px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.4);
+        }
+        
+        .direction-control h3 {
+            margin: 0 0 10px 0;
+            color: #f39c12;
+        }
+        
+        .vehicle-count {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+            color: #ecf0f1;
+        }
+        
+        .btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        
+        .btn-emergency {
+            background-color: #e74c3c;
+            font-weight: bold;
+            padding: 15px 25px;
+            margin-top: 20px;
+        }
+        
+        .btn-emergency:hover {
+            background-color: #c0392b;
+        }
+        
+        .status-panel {
+            background-color: #34495e;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.4);
+        }
+        
+        .status-panel h2 {
+            color: #f39c12;
+            margin-top: 0;
+        }
+        
+        .status-info {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+        }
+        
+        .status-item {
+            margin: 10px;
+            padding: 10px;
+            background-color: #2c3e50;
+            border-radius: 5px;
+            min-width: 150px;
+        }
+        
+        .emergency-active {
+            animation: emergencyFlash 1s infinite;
+        }
+        
+        @keyframes emergencyFlash {
+            0%, 100% { background-color: #34495e; }
+            50% { background-color: #e74c3c; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Four-Way Traffic Light System</h1>
+        
+        <div class="junction">
+            <div class="road road-horizontal"></div>
+            <div class="road road-vertical"></div>
+            <div class="center-circle"></div>
+            
+            <!-- North Traffic Light -->
+            <div class="traffic-light north">
+                <div class="light red" id="north-red"></div>
+                <div class="light yellow" id="north-yellow"></div>
+                <div class="light green" id="north-green"></div>
+                <div class="direction-label">NORTH</div>
+            </div>
+            
+            <!-- East Traffic Light -->
+            <div class="traffic-light east">
+                <div class="light red" id="east-red"></div>
+                <div class="light yellow" id="east-yellow"></div>
+                <div class="light green" id="east-green"></div>
+                <div class="direction-label">EAST</div>
+            </div>
+            
+            <!-- South Traffic Light -->
+            <div class="traffic-light south">
+                <div class="light red" id="south-red"></div>
+                <div class="light yellow" id="south-yellow"></div>
+                <div class="light green" id="south-green"></div>
+                <div class="direction-label">SOUTH</div>
+            </div>
+            
+            <!-- West Traffic Light -->
+            <div class="traffic-light west">
+                <div class="light red" id="west-red"></div>
+                <div class="light yellow" id="west-yellow"></div>
+                <div class="light green" id="west-green"></div>
+                <div class="direction-label">WEST</div>
+            </div>
+        </div>
+        
+        <div class="vehicle-controls">
+            <div class="direction-control">
+                <h3>North</h3>
+                <div class="vehicle-count" id="north-count">0</div>
+                <div>
+                    <button class="btn" onclick="updateVehicleCount('north', 1)">+1</button>
+                    <button class="btn" onclick="updateVehicleCount('north', -1)">-1</button>
+                </div>
+            </div>
+            
+            <div class="direction-control">
+                <h3>East</h3>
+                <div class="vehicle-count" id="east-count">0</div>
+                <div>
+                    <button class="btn" onclick="updateVehicleCount('east', 1)">+1</button>
+                    <button class="btn" onclick="updateVehicleCount('east', -1)">-1</button>
+                </div>
+            </div>
+            
+            <div class="direction-control">
+                <h3>South</h3>
+                <div class="vehicle-count" id="south-count">0</div>
+                <div>
+                    <button class="btn" onclick="updateVehicleCount('south', 1)">+1</button>
+                    <button class="btn" onclick="updateVehicleCount('south', -1)">-1</button>
+                </div>
+            </div>
+            
+            <div class="direction-control">
+                <h3>West</h3>
+                <div class="vehicle-count" id="west-count">0</div>
+                <div>
+                    <button class="btn" onclick="updateVehicleCount('west', 1)">+1</button>
+                    <button class="btn" onclick="updateVehicleCount('west', -1)">-1</button>
+                </div>
+            </div>
+        </div>
+        
+        <button class="btn btn-emergency" onclick="toggleEmergency()">EMERGENCY MODE</button>
+        
+        <div class="status-panel" id="status-panel">
+            <h2>System Status</h2>
+            <div class="status-info">
+                <div class="status-item">
+                    <strong>Current State:</strong> <span id="current-state">NORTH_GO</span>
+                </div>
+                <div class="status-item">
+                    <strong>Emergency Mode:</strong> <span id="emergency-status">Inactive</span>
+                </div>
+                <div class="status-item">
+                    <strong>Green Light Duration:</strong> <span id="green-duration">15</span>s
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Traffic light states
+        const TrafficState = {
+            NORTH_GO: 0,
+            NORTH_TO_EAST: 1,
+            EAST_GO: 2,
+            EAST_TO_SOUTH: 3,
+            SOUTH_GO: 4,
+            SOUTH_TO_WEST: 5,
+            WEST_GO: 6,
+            WEST_TO_NORTH: 7,
+            EMERGENCY_MODE: 8
+        };
+        
+        let currentState = TrafficState.NORTH_GO;
+        let stateTimer = 0;
+        let greenTime = 15000; // 15 seconds default
+        let yellowTime = 3000; // 3 seconds
+        let emergencyTimeout = 30000; // 30 seconds
+        
+        // Vehicle counts
+        let vehicleCount = {
+            north: 0,
+            east: 0,
+            south: 0,
+            west: 0
+        };
+        
+        let emergencyMode = false;
+        let emergencyTimer = null;
+        
+        // Initialize the traffic light system
+        function init() {
+            updateTrafficLights();
+            stateTimer = Date.now();
+            setInterval(trafficLightLoop, 100);
+        }
+        
+        // Main traffic light loop
+        function trafficLightLoop() {
+            if (!emergencyMode) {
+                normalTrafficFlow();
+            } else {
+                handleEmergencyMode();
+            }
+            
+            updateDisplay();
+        }
+        
+        // Normal traffic flow state machine
+        function normalTrafficFlow() {
+            const currentTime = Date.now();
+            
+            // Calculate dynamic green time based on vehicle counts
+            const maxVehicles = Math.max(
+                vehicleCount.north, 
+                vehicleCount.east, 
+                vehicleCount.south, 
+                vehicleCount.west
+            );
+            
+            greenTime = mapValue(maxVehicles, 0, 10, 10000, 30000);
+            
+            switch (currentState) {
+                case TrafficState.NORTH_GO:
+                    if (currentTime - stateTimer >= greenTime) {
+                        currentState = TrafficState.NORTH_TO_EAST;
+                        stateTimer = currentTime;
+                        updateTrafficLights();
+                    }
+                    break;
+                case TrafficState.NORTH_TO_EAST:
+                    if (currentTime - stateTimer >= yellowTime) {
+                        currentState = TrafficState.EAST_GO;
+                        stateTimer = currentTime;
+                        vehicleCount.north = Math.max(0, vehicleCount.north - 3);
+                        updateTrafficLights();
+                    }
+                    break;
+                case TrafficState.EAST_GO:
+                    if (currentTime - stateTimer >= greenTime) {
+                        currentState = TrafficState.EAST_TO_SOUTH;
+                        stateTimer = currentTime;
+                        updateTrafficLights();
+                    }
+                    break;
+                case TrafficState.EAST_TO_SOUTH:
+                    if (currentTime - stateTimer >= yellowTime) {
+                        currentState = TrafficState.SOUTH_GO;
+                        stateTimer = currentTime;
+                        vehicleCount.east = Math.max(0, vehicleCount.east - 3);
+                        updateTrafficLights();
+                    }
+                    break;
+                case TrafficState.SOUTH_GO:
+                    if (currentTime - stateTimer >= greenTime) {
+                        currentState = TrafficState.SOUTH_TO_WEST;
+                        stateTimer = currentTime;
+                        updateTrafficLights();
+                    }
+                    break;
+                case TrafficState.SOUTH_TO_WEST:
+                    if (currentTime - stateTimer >= yellowTime) {
+                        currentState = TrafficState.WEST_GO;
+                        stateTimer = currentTime;
+                        vehicleCount.south = Math.max(0, vehicleCount.south - 3);
+                        updateTrafficLights();
+                    }
+                    break;
+                case TrafficState.WEST_GO:
+                    if (currentTime - stateTimer >= greenTime) {
+                        currentState = TrafficState.WEST_TO_NORTH;
+                        stateTimer = currentTime;
+                        updateTrafficLights();
+                    }
+                    break;
+                case TrafficState.WEST_TO_NORTH:
+                    if (currentTime - stateTimer >= yellowTime) {
+                        currentState = TrafficState.NORTH_GO;
+                        stateTimer = currentTime;
+                        vehicleCount.west = Math.max(0, vehicleCount.west - 3);
+                        updateTrafficLights();
+                    }
+                    break;
+            }
+        }
+        
+        // Handle emergency mode
+        function handleEmergencyMode() {
+            setAllRed();
+            document.getElementById('north-green').classList.add('on');
+            
+            if (Date.now() - stateTimer >= emergencyTimeout) {
+                emergencyMode = false;
+                document.getElementById('status-panel').classList.remove('emergency-active');
+                stateTimer = Date.now();
+                updateTrafficLights();
+            }
+        }
+        
+        // Update all traffic lights based on current state
+        function updateTrafficLights() {
+            setAllLightsOff();
+            
+            switch (currentState) {
+                case TrafficState.NORTH_GO:
+                    document.getElementById('north-green').classList.add('on');
+                    break;
+                case TrafficState.NORTH_TO_EAST:
+                    document.getElementById('north-yellow').classList.add('on');
+                    break;
+                case TrafficState.EAST_GO:
+                    document.getElementById('east-green').classList.add('on');
+                    break;
+                case TrafficState.EAST_TO_SOUTH:
+                    document.getElementById('east-yellow').classList.add('on');
+                    break;
+                case TrafficState.SOUTH_GO:
+                    document.getElementById('south-green').classList.add('on');
+                    break;
+                case TrafficState.SOUTH_TO_WEST:
+                    document.getElementById('south-yellow').classList.add('on');
+                    break;
+                case TrafficState.WEST_GO:
+                    document.getElementById('west-green').classList.add('on');
+                    break;
+                case TrafficState.WEST_TO_NORTH:
+                    document.getElementById('west-yellow').classList.add('on');
+                    break;
+            }
+        }
+        
+        // Turn off all lights
+        function setAllLightsOff() {
+            const lights = document.querySelectorAll('.light');
+            lights.forEach(light => {
+                light.classList.remove('on');
+            });
+        }
+        
+        // Set all lights to red
+        function setAllRed() {
+            setAllLightsOff();
+            document.getElementById('north-red').classList.add('on');
+            document.getElementById('east-red').classList.add('on');
+            document.getElementById('south-red').classList.add('on');
+            document.getElementById('west-red').classList.add('on');
+        }
+        
+        // Update vehicle count
+        function updateVehicleCount(direction, change) {
+            vehicleCount[direction] = Math.max(0, vehicleCount[direction] + change);
+            document.getElementById(`${direction}-count`).textContent = vehicleCount[direction];
+        }
+        
+        // Toggle emergency mode
+        function toggleEmergency() {
+            emergencyMode = !emergencyMode;
+            if (emergencyMode) {
+                stateTimer = Date.now();
+                document.getElementById('status-panel').classList.add('emergency-active');
+                setAllRed();
+                document.getElementById('north-green').classList.add('on');
+            } else {
+                document.getElementById('status-panel').classList.remove('emergency-active');
+                updateTrafficLights();
+            }
+        }
+        
+        // Update the display with current status
+        function updateDisplay() {
+            // Update state text
+            const stateNames = [
+                "NORTH_GO", "NORTH_TO_EAST", "EAST_GO", "EAST_TO_SOUTH",
+                "SOUTH_GO", "SOUTH_TO_WEST", "WEST_GO", "WEST_TO_NORTH", "EMERGENCY_MODE"
+            ];
+            document.getElementById('current-state').textContent = stateNames[currentState];
+            
+            // Update emergency status
+            document.getElementById('emergency-status').textContent = emergencyMode ? "Active" : "Inactive";
+            
+            // Update green duration
+            document.getElementById('green-duration').textContent = greenTime / 1000;
+            
+            // Update vehicle counts
+            document.getElementById('north-count').textContent = vehicleCount.north;
+            document.getElementById('east-count').textContent = vehicleCount.east;
+            document.getElementById('south-count').textContent = vehicleCount.south;
+            document.getElementById('west-count').textContent = vehicleCount.west;
+        }
+        
+        // Utility function to map a value from one range to another
+        function mapValue(value, fromLow, fromHigh, toLow, toHigh) {
+            return toLow + (toHigh - toLow) * (value - fromLow) / (fromHigh - fromLow);
+        }
+        
+        // Initialize the system when the page loads
+        window.onload = init;
+    </script>
+</body>
+</html>
